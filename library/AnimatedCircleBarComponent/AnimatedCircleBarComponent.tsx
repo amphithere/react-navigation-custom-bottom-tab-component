@@ -149,7 +149,7 @@ class AnimatedCircleBarComponent extends React.Component<Props, State> {
   };
 
   renderAnimatedBackground = () => {
-    const { navigation } = this.props;
+    const { navigation, animatedBackgroundStyle } = this.props;
     const { state } = navigation;
     const { routes } = state;
 
@@ -174,7 +174,7 @@ class AnimatedCircleBarComponent extends React.Component<Props, State> {
                 translateX,
               },
             ],
-          },
+          }, animatedBackgroundStyle
         ]}
       >
         <Svg
@@ -197,7 +197,7 @@ class AnimatedCircleBarComponent extends React.Component<Props, State> {
 
   renderActiveItem = () => {
     const { previousIndex } = this.state;
-    const { navigation } = this.props;
+    const { navigation, activeItemStyle } = this.props;
     const { state } = navigation;
     const { routes } = state;
     const size = screenWidth / routes.length;
@@ -219,7 +219,8 @@ class AnimatedCircleBarComponent extends React.Component<Props, State> {
       outputRange: [-5, -5],
       extrapolate: 'clamp',
     });
-
+    const activeItemStyle = {styles.activeItem, ...activeItemStyle};
+    
     return (
       <Animated.View
         style={[
