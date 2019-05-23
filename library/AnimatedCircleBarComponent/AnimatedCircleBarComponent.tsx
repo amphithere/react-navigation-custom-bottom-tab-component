@@ -7,13 +7,13 @@ import {
   ViewStyle,
   Animated,
   Dimensions,
-  Easing, Platform,
+  Easing,
+  Platform,
 } from 'react-native';
 import { NavigationState } from 'react-navigation';
 import { Svg, Path } from 'react-native-svg';
 import * as shape from 'd3-shape';
 
-const { width: screenWidth } = Dimensions.get('window');
 const height = 49;
 const duration = 200;
 
@@ -37,6 +37,7 @@ interface RNProps {
 
 interface State {
   previousIndex: null | number;
+  screenWidth: null | number;
 }
 
 type Props = RNProps & OverwriteProps;
@@ -55,10 +56,11 @@ const platformZeroPoint = Platform.select({
 class AnimatedCircleBarComponent extends React.Component<Props, State> {
   currentIndexAnimatedValue: Animated.Value;
   itemsAnimation: Animated.Value[];
-  data: { x: number; y: number }[];
+  //   data: { x: number; y: number }[];
 
   state = {
     previousIndex: null,
+    screenWidth: Dimensions.get('window').width,
   };
 
   constructor(props: Props) {
@@ -69,26 +71,56 @@ class AnimatedCircleBarComponent extends React.Component<Props, State> {
     const { routes } = state;
 
     this.currentIndexAnimatedValue = new Animated.Value(state.index);
-    this.itemsAnimation = routes.map((_route, index) => new Animated.Value(state.index === index ? 0 : 1));
+    this.itemsAnimation = routes.map(
+      (_route, index) => new Animated.Value(state.index === index ? 0 : 1)
+    );
 
-    this.data = [
+    // this.data = this.renderData();
+  }
+
+  componentDidMount() {
+    Dimensions.addEventListener('change', ({ window }) => {
+      let screenWidth = window.width;
+      this.setState({ screenWidth });
+    });
+  }
+
+  data = () => {
+    let { screenWidth } = this.state;
+    const { navigation } = this.props;
+    const { state } = navigation;
+    const { routes } = state;
+    return [
       { x: 0, y: platformZeroPoint },
       { x: 10, y: platformZeroPoint },
       { x: screenWidth / (routes.length * 2), y: 20 },
       { x: screenWidth / routes.length - 10, y: platformZeroPoint },
       { x: screenWidth / routes.length, y: platformZeroPoint },
     ];
-  }
-
-  shouldComponentUpdate(nextProps: Readonly<Props>, nextState: Readonly<State>): boolean {
+  };
+  shouldComponentUpdate(
+    nextProps: Readonly<Props>,
+    nextState: Readonly<State>
+  ): boolean {
+    const languageUpdate =
+      this.props.navigation.state.params &&
+      typeof nextProps.navigation.state.params.language !== 'undefined' &&
+      typeof this.props.navigation.state.params.language !== 'undefined'
+        ? nextProps.navigation.state.params.language !==
+          this.props.navigation.state.params.language
+        : false;
     return (
       nextProps.navigation.state.index !== this.props.navigation.state.index ||
-      this.state.previousIndex !== nextState.previousIndex
+      this.state.previousIndex !== nextState.previousIndex ||
+      this.state.screenWidth !== nextState.screenWidth ||
+      languageUpdate
     );
   }
 
   componentDidUpdate(prevProps: Readonly<Props>): void {
-    if (prevProps.navigation.state.index !== this.props.navigation.state.index) {
+    if (
+      prevProps.navigation.state.index !== this.props.navigation.state.index
+    ) {
       this.setState({
         previousIndex: prevProps.navigation.state.index,
       });
@@ -120,26 +152,52 @@ class AnimatedCircleBarComponent extends React.Component<Props, State> {
     ]).start();
   };
 
-  renderLabel = ({ focused, route, index }: { index: number; focused: boolean; route: any }) => {
+  renderLabel = ({
+    focused,
+    route,
+    index,
+  }: {
+    index: number;
+    focused: boolean;
+    route: any;
+  }) => {
     if (focused) {
       return null;
     }
 
-    const { getLabelText, activeTintColor, inactiveTintColor, allowFontScaling, labelStyle } = this.props;
+    const {
+      getLabelText,
+      activeTintColor,
+      inactiveTintColor,
+      allowFontScaling,
+      labelStyle,
+      screenProps: { translate },
+    } = this.props;
     const color = focused ? activeTintColor : inactiveTintColor;
-
     return (
       <Animated.Text
         allowFontScaling={allowFontScaling}
-        style={[styles.text, labelStyle, { color, opacity: this.itemsAnimation[index] }]}
+        style={[
+          styles.text,
+          labelStyle,
+          { color, opacity: this.itemsAnimation[index] },
+        ]}
       >
-        {getLabelText({ route })}
+        {translate(getLabelText({ route }))}
       </Animated.Text>
     );
   };
 
-  renderIcon = (props: { index: number; route: any; focused: boolean, forceRender?: boolean }): React.ReactNode => {
-    const { renderIcon } = this.props;
+  renderIcon = (props: {
+    index: number;
+    route: any;
+    focused: boolean;
+    forceRender?: boolean;
+    tintColor?: string;
+  }): React.ReactNode => {
+    const { renderIcon, activeTintColor, inactiveTintColor } = this.props;
+    const color = props.focused ? activeTintColor : inactiveTintColor;
+    props.tintColor = color;
 
     if (!props.forceRender && props.focused) {
       return null;
@@ -149,13 +207,19 @@ class AnimatedCircleBarComponent extends React.Component<Props, State> {
   };
 
   renderAnimatedBackground = () => {
-    const { navigation, animatedBackgroundStyle } = this.props;
+    const {
+      navigation,
+      style: { backgroundColor },
+    } = this.props;
     const { state } = navigation;
     const { routes } = state;
+    const screenWidth = this.state;
 
     const translateX = this.currentIndexAnimatedValue.interpolate({
       inputRange: routes.map((_route, index) => index),
-      outputRange: routes.map((_route, index) => index * (screenWidth / routes.length)),
+      outputRange: routes.map(
+        (_route, index) => index * (screenWidth.screenWidth / routes.length)
+      ),
       extrapolate: 'clamp',
     });
 
@@ -168,17 +232,17 @@ class AnimatedCircleBarComponent extends React.Component<Props, State> {
             right: 0,
             top: 0,
             bottom: 0,
-            width: screenWidth / routes.length,
+            width: screenWidth.screenWidth / routes.length,
             transform: [
               {
                 translateX,
               },
             ],
-          }, animatedBackgroundStyle
+          },
         ]}
       >
         <Svg
-          width={screenWidth / routes.length}
+          width={screenWidth.screenWidth / routes.length}
           height={height}
           style={{
             top: -(height - platformZeroPoint),
@@ -189,22 +253,29 @@ class AnimatedCircleBarComponent extends React.Component<Props, State> {
             ],
           }}
         >
-          <Path d={line(this.data)} stroke={'rgba(0, 0, 0, .3)'} strokeWidth={StyleSheet.hairlineWidth} fill="white" />
+          <Path
+            d={line(this.data())}
+            stroke={backgroundColor}
+            strokeWidth={StyleSheet.hairlineWidth}
+            fill={backgroundColor}
+          />
         </Svg>
       </Animated.View>
     );
   };
 
   renderActiveItem = () => {
-    const { previousIndex } = this.state;
-    const { navigation, activeItemStyle } = this.props;
+    const { previousIndex, screenWidth } = this.state;
+    const { navigation } = this.props;
     const { state } = navigation;
     const { routes } = state;
     const size = screenWidth / routes.length;
 
     const translateX = this.currentIndexAnimatedValue.interpolate({
       inputRange: routes.map((_route, index) => index),
-      outputRange: routes.map((_route, index) => index * (screenWidth / routes.length)),
+      outputRange: routes.map(
+        (_route, index) => index * (screenWidth / routes.length)
+      ),
       extrapolate: 'clamp',
     });
 
@@ -219,8 +290,7 @@ class AnimatedCircleBarComponent extends React.Component<Props, State> {
       outputRange: [-5, -5],
       extrapolate: 'clamp',
     });
-    const activeItemStyle = {styles.activeItem, ...activeItemStyle};
-    
+
     return (
       <Animated.View
         style={[
@@ -298,7 +368,10 @@ class AnimatedCircleBarComponent extends React.Component<Props, State> {
           const focused = state.index === index;
 
           return (
-            <TouchableWithoutFeedback onPress={() => onTabPress({ route })} key={index.toString()}>
+            <TouchableWithoutFeedback
+              onPress={() => onTabPress({ route })}
+              key={index.toString()}
+            >
               <View style={styles.item}>
                 {this.renderIcon({ index, route, focused })}
                 {this.renderLabel({ index, route, focused })}
